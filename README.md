@@ -1,4 +1,4 @@
-```markdown
+
 # 库存扣减系统
 
 ## 项目简介
@@ -25,7 +25,7 @@
 
 ## 项目结构
 
-```
+```text
 src/main/java/com/example/inventorydemo
 ├── controller
 │   ├── GoodsController          # 商品增删改查
@@ -44,13 +44,12 @@ src/main/java/com/example/inventorydemo
 │   └── StockLog
 └── common
     └── Result                   # 统一返回体
-
+    
 src/main/resources
 ├── application.properties
 └── static
     └── index.html               # 前端演示页面
 ```
-
 ## 接口列表
 
 ### 商品
@@ -83,7 +82,6 @@ src/main/resources
   "data": {}
 }
 ```
-
 ## 压测对比
 
 压测条件：JMeter，200 线程，Loop Count 100，库存初始值 10。
@@ -142,9 +140,3 @@ http://localhost:8080/index.html
    - 商品列表：`GET http://localhost:8080/goods/list`
    - 库存扣减：`POST http://localhost:8080/inventory/deduct?goodsId=1&num=1`
    - 流水查询：`GET http://localhost:8080/stock-log/list?goodsId=1`
-
-## 作者
-
-- 东南大学成贤学院本科
-- 前南京海隆 Java 工程师
-- 目标城市：苏州
