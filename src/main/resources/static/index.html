@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品库存演示</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f5f6f8;
+            color: #333;
+            padding: 24px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 { font-size: 22px; margin-bottom: 20px; }
+        section {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .06);
+        }
+        h2 { font-size: 16px; margin-bottom: 12px; color: #555; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+        th { background: #fafafa; color: #888; font-weight: normal; }
+        tr:last-child td { border-bottom: none; }
+        .qty { font-weight: bold; color: #e67e22; }
+        button {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            background: #409eff;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        button:hover { background: #2f8ae8; }
+        button:disabled { background: #bbb; cursor: not-allowed; }
+        #status {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #67c23a;
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+        .muted { color: #999; }
+    </style>
+</head>
+<body>
+<h1>商品库存演示</h1>
+<div id="status"></div>
+
+<section>
+    <h2>商品列表</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>名称</th>
+            <th>价格</th>
+            <th>当前库存</th>
+            <th>操作</th>
+        </tr>
+        </thead>
+        <tbody id="goodsBody"></tbody>
+    </table>
+</section>
+
+<section>
+    <h2>最近流水（商品 #1）</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>时间</th>
+            <th>扣减前</th>
+            <th>扣减后</th>
+            <th>变动</th>
+        </tr>
+        </thead>
+        <tbody id="logsBody"></tbody>
+    </table>
+</section>
+
+<script>
+    // 统一请求封装：返回 data；code != 200 或网络错误时弹窗并返回 null
+    async function request(url, options) {
+        try {
+            const resp = await fetch(url, options);
+            const body = await resp.json();
+            if (body && body.code === 200) {
+                return body.data;
+            }
+            alert(body && body.message ? body.message : '请求失败（code=' + (body && body.code) + '）');
+            return null;
+        } catch (e) {
+            alert('请求失败: ' + e.message);
+            return null;
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+        });
+    }
+
+    function showStatus(msg) {
+        var el = document.getElementById('status');
+        el.textContent = msg;
+        el.style.display = 'block';
+        clearTimeout(el._timer);
+        el._timer = setTimeout(function () { el.style.display = 'none'; }, 1500);
+    }
+
+    // 加载商品列表，并为每个商品查询库存
+    async function loadGoods() {
+        var goodsList = await request('/goods/list');
+        if (goodsList === null) return;
+        var tbody = document.getElementById('goodsBody');
+        tbody.innerHTML = '';
+        goodsList.forEach(function (g) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + escapeHtml(g.name) + '</td>' +
+                '<td>¥' + Number(g.price).toFixed(2) + '</td>' +
+                '<td class="qty" id="stock-' + g.id + '">加载中…</td>' +
+                '<td><button onclick="deduct(' + g.id + ')">扣减 1 件</button></td>';
+            tbody.appendChild(tr);
+            loadStock(g.id);
+        });
+    }
+
+    async function loadStock(goodsId) {
+        var qty = await request('/inventory/' + goodsId);
+        var cell = document.getElementById('stock-' + goodsId);
+        if (cell) cell.textContent = qty == null ? '-' : qty;
+    }
+
+    // 扣减 1 件，成功后刷新该商品库存和底部流水
+    async function deduct(goodsId) {
+        var data = await request('/inventory/deduct?goodsId=' + goodsId + '&num=1', {method: 'POST'});
+        if (data === null) return; // 失败已弹窗
+        showStatus('扣减成功');
+        await loadStock(goodsId);
+        await loadLogs();
+    }
+
+    // 底部流水：只显示 goodsId=1 的最近 20 条
+    async function loadLogs() {
+        var logs = await request('/stock-log/list?goodsId=1');
+        if (logs === null) return;
+        var tbody = document.getElementById('logsBody');
+        tbody.innerHTML = '';
+        logs.slice(0, 20).forEach(function (log) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + formatTime(log.createdAt) + '</td>' +
+                '<td>' + log.beforeQuantity + '</td>' +
+                '<td>' + log.afterQuantity + '</td>' +
+                '<td class="muted">' + (log.changeNum > 0 ? '+' : '') + log.changeNum + '</td>';
+            tbody.appendChild(tr);
+        });
+    }
+
+    function formatTime(t) {
+        if (!t) return '-';
+        return t.replace('T', ' ').substring(0, 19);
+    }
+
+    loadGoods();
+    loadLogs();
+</script>
+</body>
+</html>
