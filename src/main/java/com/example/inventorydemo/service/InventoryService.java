@@ -5,6 +5,7 @@ import com.example.inventorydemo.mapper.InventoryMapper;
 import com.example.inventorydemo.mapper.StockLogMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InventoryService {
@@ -30,6 +31,7 @@ public class InventoryService {
      * @param num 扣减数量
      * @return true 扣减成功，false 库存不足
      */
+    @Transactional(rollbackFor = Exception.class)
     public boolean deduct(Long goodsId, Integer num) {
         // 先查当前库存，仅用于记录流水的前后值
         Integer before = inventoryMapper.selectQuantity(goodsId);
